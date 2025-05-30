@@ -1,0 +1,30 @@
+# C 컴파일 산출물
+*.o
+*.obj
+*.so
+*.a
+*.out
+*.exe
+*.dll
+
+# 디버그 정보
+*.dSYM/
+*.stackdump
+*.core
+*.gcno
+*.gcda
+*.gcov
+
+# 에디터 및 운영체제에서 생성하는 임시 파일
+*~
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# VSCode 설정 파일 (개인 설정이라면 무시해도 무방)
+.vscode/
+
+# 빌드 디렉토리 (예: makefile 빌드 시 사용)
+build/
+bin/
