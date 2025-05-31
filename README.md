@@ -33,7 +33,7 @@ The manual is available at:
 | 이름 | GitHub 주소 |
 |------|--------------|
 | 김성광 | [https://github.com/badapodo](https://github.com/badapodo) |
-| 김경연 | [https://github.com/yomce](https://github.com/yomce) |
+| 박지성 | [https://github.com/pjs0719](https://github.com/pjs0719) |
 | (팀원 이름) | (팀원 GitHub 주소) |
 
 ---
