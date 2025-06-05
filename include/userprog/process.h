@@ -16,4 +16,12 @@ void process_close_file(int fd);
 struct file *process_get_file(int fd);
 void process_remove_file(int fd);
 
+bool install_page(void *upage, void *kpage, bool writable);
+
+struct lazy_info {
+    struct file *file;
+    off_t offset;
+    size_t page_read_bytes;
+};
+
 #endif /* userprog/process.h */

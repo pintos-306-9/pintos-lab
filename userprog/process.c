@@ -1,5 +1,4 @@
 #include "userprog/process.h"
-#include "devices/timer.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -651,6 +650,7 @@ static bool load(const char *file_name, struct intr_frame *if_) {
                     read_bytes = 0;
                     zero_bytes = ROUND_UP(page_offset + phdr.p_memsz, PGSIZE);
                 }
+                // printf("적재 위치: %d\n", mem_page);
                 if (!load_segment(
                         file, file_page,
                         (void *)
@@ -821,6 +821,16 @@ static bool install_page(void *upage, void *kpage, bool writable) {
             pml4_set_page(t->pml4, upage, kpage, writable));
 }
 #else
+
+bool install_page(void *upage, void *kpage, bool writable) {
+    struct thread *t = thread_current();
+
+    /* Verify that there's not already a page at that virtual
+     * address, then map our page there. */
+    return (pml4_get_page(t->pml4, upage) == NULL &&
+            pml4_set_page(t->pml4, upage, kpage, writable));
+}
+
 /* From here, codes will be used after project 3.
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
@@ -829,6 +839,21 @@ static bool lazy_load_segment(struct page *page, void *aux) {
     /* TODO: Load the segment from the file */
     /* TODO: This called when the first page fault occurs on address VA. */
     /* TODO: VA is available when calling this function. */
+    struct file *file = ((struct lazy_info *)aux)->file;
+    off_t offset = ((struct lazy_info *)aux)->offset;
+    size_t page_read_bytes = ((struct lazy_info *)aux)->page_read_bytes;
+    size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+    file_seek(file, offset);
+
+    if (file_read(file, page->frame->kva, page_read_bytes) !=
+        (int)page_read_bytes) {
+        palloc_free_page(page->frame->kva);
+        return false;
+    }
+    memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes);
+
+    return true;
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -848,6 +873,7 @@ static bool lazy_load_segment(struct page *page, void *aux) {
 static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
                          uint32_t read_bytes, uint32_t zero_bytes,
                          bool writable) {
+
     ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
     ASSERT(pg_ofs(upage) == 0);
     ASSERT(ofs % PGSIZE == 0);
@@ -860,15 +886,22 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
         /* TODO: Set up aux to pass information to the lazy_load_segment. */
+        struct lazy_info *info =
+            (struct lazy_info *)malloc(sizeof(struct lazy_info));
+        info->file = file;
+        info->offset = ofs;
+        info->page_read_bytes = page_read_bytes;
+
         void *aux = NULL;
         if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable,
-                                            lazy_load_segment, aux))
+                                            lazy_load_segment, info))
             return false;
 
         /* Advance. */
         read_bytes -= page_read_bytes;
         zero_bytes -= page_zero_bytes;
         upage += PGSIZE;
+        ofs += page_read_bytes;
     }
     return true;
 }
@@ -877,12 +910,20 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
 static bool setup_stack(struct intr_frame *if_) {
     bool success = false;
     void *stack_bottom = (void *)(((uint8_t *)USER_STACK) - PGSIZE);
+    // printf("스택 bottom: %d\n", stack_bottom);
 
     /* TODO: Map the stack on stack_bottom and claim the page immediately.
      * TODO: If success, set the rsp accordingly.
      * TODO: You should mark the page is stack. */
     /* TODO: Your code goes here */
+    if (vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, 1)) {
+        success = vm_claim_page(stack_bottom);
+        if (success) {
 
+            if_->rsp = USER_STACK;
+            thread_current()->stack_bottom = stack_bottom;
+        }
+    }
     return success;
 }
 #endif /* VM */
