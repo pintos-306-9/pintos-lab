@@ -17,6 +17,7 @@ struct file *process_get_file(int fd);
 void process_remove_file(int fd);
 
 bool install_page(void *upage, void *kpage, bool writable);
+bool lazy_load_segment(struct page *page, void *aux);
 
 struct lazy_info {
     struct file *file;
