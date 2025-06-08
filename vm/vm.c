@@ -6,6 +6,9 @@
 #include "userprog/process.h"
 #include "vm/inspect.h"
 
+struct list frame_table;
+struct list_elem *start;
+
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 void vm_init(void) {
@@ -17,6 +20,8 @@ void vm_init(void) {
     register_inspect_intr();
     /* DO NOT MODIFY UPPER LINES. */
     /* TODO: Your code goes here. */
+    list_init(&frame_table);
+    start = list_begin(&frame_table);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -83,7 +88,9 @@ err:
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *spt_find_page(struct supplemental_page_table *spt UNUSED,
                            void *va UNUSED) {
+    struct page hello;
     struct page *page = (struct page *)malloc(sizeof(struct page));
+    page->va = va;
     struct hash_elem *e;
 
     /* TODO: Fill this function. */
@@ -122,7 +129,23 @@ void spt_remove_page(struct supplemental_page_table *spt, struct page *page) {
 static struct frame *vm_get_victim(void) {
     struct frame *victim = NULL;
     /* TODO: The policy for eviction is up to you. */
-
+    struct thread *curr = thread_current();
+    struct list_elem *e = start;
+    for (start = e; start != list_end(&frame_table); start = list_next(start)) {
+        victim = list_entry(start, struct frame, frame_elem);
+        if (pml4_is_accessed(curr->pml4, victim->page->va))
+            pml4_set_accessed(curr->pml4, victim->page->va, 0);
+        else
+            return victim;
+    }
+    for (start = list_begin(&frame_table); start != e;
+         start = list_next(start)) {
+        victim = list_entry(start, struct frame, frame_elem);
+        if (pml4_is_accessed(curr->pml4, victim->page->va))
+            pml4_set_accessed(curr->pml4, victim->page->va, 0);
+        else
+            return victim;
+    }
     return victim;
 }
 
@@ -131,8 +154,9 @@ static struct frame *vm_get_victim(void) {
 static struct frame *vm_evict_frame(void) {
     struct frame *victim UNUSED = vm_get_victim();
     /* TODO: swap out the victim and return the evicted frame. */
+    swap_out(victim->page);
 
-    return NULL;
+    return victim;
 }
 
 /* palloc() and get frame. If there is no available page, evict the page
@@ -144,6 +168,14 @@ static struct frame *vm_get_frame(void) {
     /* TODO: Fill this function. */
 
     frame->kva = palloc_get_page(PAL_USER);
+    if (frame->kva == NULL) {
+        frame = vm_evict_frame();
+        frame->page = NULL;
+
+        return frame;
+    }
+    list_push_back(&frame_table, &frame->frame_elem);
+
     frame->page = NULL;
 
     ASSERT(frame != NULL);
@@ -179,7 +211,6 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
     void *rsp_stack =
         is_kernel_vaddr(f->rsp) ? thread_current()->rsp_stack : f->rsp;
     if (not_present) {
-        // printf("not_present: %d\n", addr);
         if (!vm_claim_page(addr)) {
             if (rsp_stack - 8 <= addr && USER_STACK - 0x100000 <= addr &&
                 addr <= USER_STACK) {

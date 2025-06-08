@@ -130,8 +130,7 @@ void syscall_handler(struct intr_frame *f UNUSED) {
 /* ---------------validator---------------- */
 
 bool validate_user_address(void *address) {
-    if (!is_user_vaddr(address) ||
-        pml4_get_page(thread_current()->pml4, address) == NULL) {
+    if (!is_user_vaddr(address) || address == NULL) {
         return false;
     }
     return true;
