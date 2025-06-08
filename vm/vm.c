@@ -327,6 +327,9 @@ void spt_destructor(struct hash_elem *e, void *aux) {
 
 /* Free the resource hold by the supplemental page table */
 void supplemental_page_table_kill(struct supplemental_page_table *spt UNUSED) {
+    if (!hash_empty(&spt->pages)) {
+        return;
+    }
     struct hash_iterator i;
 
     hash_first(&i, &spt->pages);
@@ -334,8 +337,8 @@ void supplemental_page_table_kill(struct supplemental_page_table *spt UNUSED) {
         struct page *page = hash_entry(hash_cur(&i), struct page, hash_elem);
 
         if (page->operations->type == VM_FILE) {
-            // do_munmap(page->va);
-            destroy(page);
+            do_munmap(page->va);
+            // destroy(page);
         }
     }
     hash_destroy(&spt->pages, spt_destructor);
