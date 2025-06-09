@@ -4,8 +4,8 @@
 #include "threads/palloc.h"
 #include "lib/kernel/hash.h"
 #include "include/lib/kernel/list.h"
-#define VM;
-#define USERPROG;
+#include "threads/synch.h"
+
 
 enum vm_type {
 	/* page not initialized */
@@ -52,6 +52,7 @@ struct page {
 	/* Your implementation */
 	struct hash_elem hash_elem;
 	bool writable; //읽기 쓰기 권한
+	int mapped_page_count;
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
 	union {
@@ -72,6 +73,11 @@ struct frame {
 	struct lock frame_lock;
 };
 
+struct slot {
+    struct page *page;
+    uint32_t slot_no;
+    struct list_elem swap_elem;
+};
 /* The function table for page operations.
  * This is one way of implementing "interface" in C.
  * Put the table of "method" into the struct's member, and
@@ -115,9 +121,11 @@ bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
 unsigned page_hash(const struct hash_elem *p_, void *aux UNUSED);
 bool page_less(const struct hash_elem *a_, const struct hash_elem *b_, void *aux UNUSED);
+void hash_page_destroy(struct hash_elem *e, void *aux);
 
 struct list frame_table;
 static struct lock frame_table_lock;
-
+struct lock swap_table_lock;
+struct list swap_table;
 
 #endif  /* VM_VM_H */

@@ -19,6 +19,7 @@
 #include "filesys/fat.h"
 #include "filesys/inode.h"
 
+void check_address(void *addr);
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
 bool validate_user_address(void *address);
@@ -57,6 +58,9 @@ void syscall_handler(struct intr_frame *f UNUSED) {
     // printf("[DEBUG] syscall_handler invoked! rax=%lld\n", f->R.rax);
 
     uint64_t syscall_num = f->R.rax;
+    #ifdef VM
+	thread_current()->rsp_stack = f->rsp;
+    #endif
 
     switch (syscall_num) {
     case SYS_WRITE:
@@ -113,6 +117,13 @@ void syscall_handler(struct intr_frame *f UNUSED) {
         f->R.rax = remove(f->R.rdi);
         break;
 
+    case SYS_MMAP:
+        f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+        break;
+        
+    case SYS_MUNMAP:
+        munmap(f->R.rdi);
+        break;
     default:
         printf("Unknown syscall number: %lld\n", syscall_num);
         thread_exit();
@@ -138,7 +149,42 @@ bool validate_kernel_address(void *address) {
 
 bool validate_fd(int fd) { return !(fd < 0 || fd >= FD_MAX); }
 
+void check_address(void *addr) {
+    struct thread *cur = thread_current();
+    if (addr == NULL || !(is_user_vaddr(addr))) {
+        exit(-1);
+    }
+}
+
 /* ---------------system call---------------*/
+
+void *mmap(void *addr, size_t length, int writable, int fd, off_t offset) {
+    if (!addr || addr != pg_round_down(addr))
+        return NULL;
+
+    if (offset != pg_round_down(offset))
+        return NULL;
+
+    if (!is_user_vaddr(addr) || !is_user_vaddr(addr + length))
+        return NULL;
+
+    if (spt_find_page(&thread_current()->spt, addr))
+        return NULL;
+
+    struct file *f = process_get_file(fd);
+    if (f == NULL)
+        return NULL;
+
+    if (file_length(f) == 0 || (int)length <= 0)
+        return NULL;
+
+    return do_mmap(addr, length, writable, f, offset); // 파일이 매핑된 가상 주소 반환
+}
+
+void munmap(void *addr)
+{
+    do_munmap(addr);
+}
 
 int write(int fd, const void *buffer, unsigned size) {
     if (!validate_user_address(buffer)) {
@@ -239,9 +285,7 @@ int filesize(int fd) {
 }
 
 int read(int fd, void *buffer, unsigned size) {
-    if (!validate_user_address(buffer)) {
-        exit(-1);
-    }
+    check_address(buffer); // 주소 유효성 검사 (페이지 폴트 방지)
 
     if (!validate_fd(fd)) {
         return -1;
@@ -253,6 +297,13 @@ int read(int fd, void *buffer, unsigned size) {
     if (file_fd == NULL) {
         return -1;
     }
+
+    // 주소에 해당하는 페이지가 쓰기 가능한지 확인
+    struct page *page = spt_find_page(&cur->spt, buffer);
+    if (page && !page->writable) {
+        exit(-1); // 쓰기 불가능한 주소에 read는 불허
+    }
+
     if (fd == 0) {
         int i;
         unsigned char *buf = buffer;
@@ -265,12 +316,13 @@ int read(int fd, void *buffer, unsigned size) {
         }
         read_result = i;
     } else if (fd == 1) {
-        read_result = -1;
+        read_result = -1; // STDOUT에 read 시도는 오류
     } else {
         lock_acquire(&file_rw_lock);
         read_result = file_read(file_fd, buffer, size);
         lock_release(&file_rw_lock);
     }
+
     return read_result;
 }
 
