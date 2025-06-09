@@ -360,7 +360,9 @@ void seek(int fd, unsigned position) {
     }
 
     struct file *f = process_get_file(fd);
+    lock_acquire(&file_rw_lock);
     file_seek(f, position);
+    lock_release(&file_rw_lock);
 }
 
 bool remove(const char *file_name) {
