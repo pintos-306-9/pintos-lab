@@ -327,7 +327,7 @@ void spt_destructor(struct hash_elem *e, void *aux) {
 
 /* Free the resource hold by the supplemental page table */
 void supplemental_page_table_kill(struct supplemental_page_table *spt UNUSED) {
-    if (!hash_empty(&spt->pages)) {
+    if (hash_empty(&spt->pages)) {
         return;
     }
     struct hash_iterator i;
