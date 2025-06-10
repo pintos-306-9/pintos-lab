@@ -145,6 +145,17 @@ bool validate_kernel_address(void *address) {
 
 bool validate_fd(int fd) { return !(fd < 0 || fd >= FD_MAX); }
 
+bool validate_writable(void *buffer) {
+    struct supplemental_page_table spt = thread_current()->spt;
+    struct page *page = spt_find_page(&spt, buffer);
+
+    if (!page->writable) {
+        return false;
+    }
+
+    return true;
+}
+
 /* ---------------system call---------------*/
 
 int write(int fd, const void *buffer, unsigned size) {
@@ -246,7 +257,7 @@ int filesize(int fd) {
 }
 
 int read(int fd, void *buffer, unsigned size) {
-    if (!validate_user_address(buffer)) {
+    if (!validate_user_address(buffer) || !validate_writable(buffer)) {
         exit(-1);
     }
 
