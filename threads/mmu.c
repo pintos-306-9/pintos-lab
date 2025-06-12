@@ -94,7 +94,7 @@ pml4e_walk (uint64_t *pml4e, const uint64_t va, int create) {
  * allocation fails. */
 uint64_t *
 pml4_create (void) {
-	uint64_t *pml4 = palloc_get_page (0);
+	uint64_t *pml4 = palloc_get_page (0); //플래그로 0을 넘김 -> 플래그 없이 기본 설정값으로 할당을 요청하겠다는 의미. 이 경우 커널 풀에 할당됨
 	if (pml4)
 		memcpy (pml4, base_pml4, PGSIZE);
 	return pml4;

@@ -16,6 +16,7 @@
 void debug_panic (const char *file, int line, const char *function,
 		const char *message, ...) PRINTF_FORMAT (4, 5) NO_RETURN;
 void debug_backtrace (void);
+#define VM
 
 #endif
 
