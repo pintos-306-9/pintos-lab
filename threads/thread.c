@@ -261,6 +261,8 @@ tid_t thread_create(const char *name, int priority, thread_func *function,
     t->stdout_count = 1;
     tid = t->tid = allocate_tid();
 
+    supplemental_page_table_init(&t->spt);
+
     struct thread *cur = thread_current();
     list_push_back(&cur->child_list, &t->child_elem);
 

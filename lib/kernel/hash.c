@@ -8,6 +8,7 @@
 #include "hash.h"
 #include "../debug.h"
 #include "threads/malloc.h"
+#include "include/vm/file.h"
 
 #define list_elem_to_hash_elem(LIST_ELEM)                       \
 	list_entry(LIST_ELEM, struct hash_elem, list_elem)
@@ -83,6 +84,7 @@ hash_destroy (struct hash *h, hash_action_func *destructor) {
 		hash_clear (h, destructor);
 	free (h->buckets);
 }
+
 
 /* Inserts NEW into hash table H and returns a null pointer, if
    no equal element is already in the table.
